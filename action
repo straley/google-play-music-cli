@@ -5,14 +5,27 @@ on run argv
   if (count of argv) > 1 then set sub1 to item 2 of argv
   if (count of argv) > 2 then set sub2 to item 3 of argv
 
-  set status to google_play("document.getElementById('player-bar-play-pause').className.indexOf('playing')!=-1?'playing':'paused';")
-  set track to google_play("var t=document.getElementsByClassName('song-row currently-playing')[0].getAttribute('data-index'); (t?parseInt(t):-1)+1;")
-
+  set status to google_play("
+    document.getElementById('player-bar-play-pause').className.indexOf('playing')!=-1?'playing':'paused';
+  ")
+  set track to google_play("
+    var t=document.getElementsByClassName('song-row currently-playing')[0].getAttribute('data-index');
+    (t?parseInt(t):-1)+1;
+  ")
   if (command = "find") then
     google_play("window.location.hash='#/sr/' + '" & sub2 & "'.replace(/\\s+/g, '+');")
-    delay 1.5
+    delay 1.5 -- todo: check to see if loaded
     if (sub1 = "song") then
-      return google_play("d=[]; var s=document.getElementsByClassName('song-row'); for (r of s) {t = r.getElementsByClassName('aria-play-button')[0].getAttribute('aria-label'); d.push({title:t});} JSON.stringify(d);")
+      -- todo: add more attributes and way to play
+      return google_play("
+        var d=[];
+        var s=document.getElementsByClassName('song-row');
+        for (r of s) {
+          var t = r.getElementsByClassName('aria-play-button')[0].getAttribute('aria-label');
+          d.push({title:t});
+        }
+        JSON.stringify(d);
+      ")
     end if
     return "[]"
   else if (command = "play") then
