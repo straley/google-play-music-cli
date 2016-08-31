@@ -1,0 +1,62 @@
+#!/usr/bin/osascript
+
+on run argv
+  set command to item 1 of argv
+  if (count of argv) > 1 then set sub1 to item 2 of argv
+  if (count of argv) > 2 then set sub2 to item 3 of argv
+
+  set status to google_play("document.getElementById('player-bar-play-pause').className.indexOf('playing')!=-1?'playing':'paused';")
+  set track to google_play("var t=document.getElementsByClassName('song-row currently-playing')[0].getAttribute('data-index'); (t?parseInt(t):-1)+1;")
+
+  if (command = "find") then
+    google_play("window.location.hash='#/sr/' + '" & sub2 & "'.replace(/\\s+/g, '+');")
+    delay 1.5
+    if (sub1 = "song") then
+      return google_play("d=[]; var s=document.getElementsByClassName('song-row'); for (r of s) {t = r.getElementsByClassName('aria-play-button')[0].getAttribute('aria-label'); d.push({title:t});} JSON.stringify(d);")
+    end if
+    return "[]"
+  else if (command = "play") then
+    if (status = "paused") then
+      google_play("document.querySelector(\"[data-id='play-pause']\").click();")
+      return
+    end if
+  else if (command = "pause") then
+    if (status = "playing") then
+      google_play("document.querySelector(\"[data-id='play-pause']\").click();")
+      return
+    end if
+  else if (command = "rewind") then
+    google_play("document.querySelector(\"[data-id='rewind']\").click();")
+    return
+  else if (command = "forward") then
+    google_play("document.querySelector(\"[data-id='forward']\").click();")
+    return
+  else if (command = "track") then
+    return track
+  else if (command = "title") then
+    return google_play("document.getElementById('currently-playing-title').innerHTML;")
+  else if (command = "artist") then
+    return google_play("document.getElementById('player-artist').innerHTML;")
+  else if (command = "album") then
+    return google_play("document.getElementById('player-album').innerHTML;")
+  else if (command = "duration") then
+    return google_play("document.getElementById('time_container_duration').innerHTML;")
+  else if (command = "position") then
+    return google_play("document.getElementById('time_container_current').innerHTML;")
+  end if
+  return
+end run
+
+on google_play(js)
+  tell application "Google Chrome"
+    repeat with w in (every window)
+      repeat with t in (every tab whose URL contains "play.google.com/music") of w
+        tell t
+          execute javascript js
+          get result
+          return result
+        end tell
+      end repeat
+    end repeat
+  end tell
+end google_play
