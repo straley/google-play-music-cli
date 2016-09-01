@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Simple Player</title>
+  <meta name="description" content="Simple Player">
+  <meta name="author" content="Scott Straley">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+  <!--[if lt IE 9]>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv.js"></script>
+  <![endif]-->
+</head>
+<body>
+  <script>
+    const lookup = () => {
+      const command = $("#command").val().toLowerCase().split(/\s+/);
+      $("#command").val("");
+      let action = "play";
+      let sub = "track";
+      let track = 0;
+
+      if (command[0] == "play") {
+        command.shift();
+        if (command[0] == "track") {
+          sub = "track";
+          command.shift();
+        } else if (command[0] == "something" && (command[1] == "from" || command[1] == "by")) {
+          sub = "artist";
+          track = -1;
+          command.shift();
+          command.shift();
+        }
+      } else if (command[0] == "skip" || command[0] == "next" || command[0] == "forward") {
+        action = "forward";
+      }
+      if (action === "play") {
+        if (sub === "track") {
+          $.getJSON( "/api/find/track/" + command.join("%20"), function( data ) {
+            if (data && data.length > 0) {
+              if (track === -1) track = Math.floor(Math.random() * data.length);
+              $("#results").html("Playing " + data[track].title + " by " + data[track].artist);
+              $.getJSON( "/api/play/" + data[track].id, function( data ) {
+                console.log(data);
+              });
+            }
+          });
+        } else if (sub === "artist") {
+          $.getJSON( "/api/find/artist/" + command.join("%20"), function( data ) {
+            if (data && data.length > 0) {
+              const id = data[0].id;
+              console.log("searching for " +id);
+              $.getJSON( "/api/search/artist/" + id.replace(/\/.*$/, ""), function( data ) {
+                console.log(data);
+                if (data && data.length > 0) {
+                  if (track === -1) track = Math.floor(Math.random() * data.length);
+                  $("#results").html("Playing " + data[track].title + " by " + data[track].artist);
+                  $.getJSON( "/api/play/" + data[track].id, function( data ) {
+                    console.log(data);
+                  });
+                }
+              });
+            }
+          });
+        }
+      } else if (action === "forward") {
+        $.getJSON( "/api/forward", function( data ) {});
+      }
+    }
+
+    const checkStatus = () => {
+      $.getJSON( "/api/status", function( data ) {
+        $("#results").html("Playing " + data.title + " by " + data.artist);
+        $("#status").html(data.position + " / " + data.duration);
+      });
+    }
+
+    $(document).ready(()=>{
+      $("#go").click(lookup);
+      $('#command').on('keypress', function (e) {
+         if(e.which === 13) {
+           lookup();
+         }
+       });
+       setInterval(checkStatus, 200);
+    })
+  </script>
+  <h1>Basic Player</h1>
+  <p>Examples:</p>
+  <p>&quot;play [track name / search]&quot;</p>
+  <p>&quot;play something from/by [artist]&quot;</p>
+  <p>&quot;next / skip / forward&quot;</p>
+  <input id="command" type="text" style="width:400px;"/><button id="go">Go</button>
+  <p id="results"></p>
+  <p id="status"></p>
+</body>
+</html>
