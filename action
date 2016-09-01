@@ -2,68 +2,193 @@
 
 on run argv
   set command to item 1 of argv
-  if (count of argv) > 1 then set sub1 to item 2 of argv
-  if (count of argv) > 2 then set sub2 to item 3 of argv
+  if (count of argv) > 1 then
+    set sub1 to item 2 of argv
+  else
+    set sub1 to false
+  end if
 
-  set status to google_play("
-    document.getElementById('player-bar-play-pause').className.indexOf('playing')!=-1?'playing':'paused';
+  if (count of argv) > 2 then
+    set sub2 to item 3 of argv
+  else
+    set sub2 to false
+  end if
+
+  set gp to "play.google.com/music"
+
+  if (not is_open(gp))
+    open_url("https://" & gp)
+    delay 1.5
+  end if
+
+
+  set status to run_js(gp, "
+    try {
+      document.getElementById('player-bar-play-pause').className.indexOf('playing')!=-1?'playing':'paused';
+    }
+    catch (e) {
+      false
+    }
   ")
-  set track to google_play("
-    var t=document.getElementsByClassName('song-row currently-playing')[0].getAttribute('data-index');
-    (t?parseInt(t):-1)+1;
+  set track to run_js(gp, "
+    try {
+      var t=document.getElementsByClassName('song-row currently-playing')[0].getAttribute('data-index');
+      (t?parseInt(t):-1)+1;
+    } catch (e) {
+      false
+    }
   ")
+  set title to run_js(gp, "document.getElementById('currently-playing-title').innerHTML;")
+  if title is missing value then set title to ""
+  set artist to run_js(gp, "document.getElementById('player-artist')?document.getElementById('player-artist').innerHTML:\"\";")
+  if artist is missing value then set artist to ""
+  set album to run_js(gp, "document.getElementById('player-album')?document.getElementById('player-album').innerHTML:\"\";")
+  if album is missing value then set album to ""
+  set duration to run_js(gp, "document.getElementById('time_container_duration').innerHTML;")
+  if duration is missing value then set duration to ""
+  set position to run_js(gp, "document.getElementById('time_container_current').innerHTML;")
+  if position is missing value then set position to ""
+
   if (command = "find") then
-    google_play("window.location.hash='#/sr/' + '" & sub2 & "'.replace(/\\s+/g, '+');")
-    delay 1.5 -- todo: check to see if loaded
-    if (sub1 = "song") then
-      -- todo: add more attributes and way to play
-      return google_play("
-        var d=[];
-        var s=document.getElementsByClassName('song-row');
-        for (r of s) {
-          var t = r.getElementsByClassName('aria-play-button')[0].getAttribute('aria-label');
-          d.push({title:t});
+    -- todo: add more attributes and way to play
+    if (sub1 = "track") then
+      run_js(gp, "window.location.hash='#/srs/' + '" & sub2 & "/EAE'.replace(/\\s+/g, '+');")
+      delay 1.5 -- todo: check to see if loaded
+      return run_js(gp, "
+          var data = [];
+          var songs = document.getElementsByClassName('song-row');
+          for (row of songs) {
+            var id = row.getAttribute('data-id');
+            var title = row.querySelector(\"[data-col='\" + titleColName + \"'] span\").innerHTML.replace(/<[^>]*>/, '');
+            var duration = row.querySelector(\"[data-col='duration'] span\").innerHTML;
+            var artist = row.querySelector(\"[data-col='artist'] span a\").innerHTML;
+            var album = row.querySelector(\"[data-col='album'] span a\").innerHTML;
+            data.push({id, title, duration, artist, album});
+          }
+          JSON.stringify(data);
+      ")
+    else if (sub1 = "album") then
+      run_js(gp, "window.location.hash='#/sral/' + '" & sub2 & "/EAM'.replace(/\\s+/g, '+');")
+      delay 1.5 -- todo: check to see if loaded
+      return run_js(gp, "
+        var data = [];
+        var albums = document.getElementsByClassName('material-card');
+        for (row of albums) {
+          var id = row.getAttribute('data-id');
+          var album = row.querySelector(\".title\").innerHTML;
+          var artist =row.querySelector(\"[data-type='artist']\").innerHTML;
+          data.push({id, album, artist});
         }
-        JSON.stringify(d);
+        JSON.stringify(data);
+      ")
+    else if (sub1 = "artist") then
+      run_js(gp, "window.location.hash='#/srar/' + '" & sub2 & "/EAI'.replace(/\\s+/g, '+');")
+      delay 1.5 -- todo: check to see if loaded
+      return run_js(gp, "
+        var data = [];
+        var albums = document.getElementsByClassName('material-card');
+        for (row of albums) {
+          var id = row.getAttribute('data-id');
+          var artist = row.querySelector(\".title\").innerHTML;
+          data.push({id, album, artist});
+        }
+        JSON.stringify(data);
       ")
     end if
     return "[]"
   else if (command = "play") then
-    if (status = "paused") then
-      google_play("document.querySelector(\"[data-id='play-pause']\").click();")
-      return
+    if (not sub1 = false) then
+      set sub1 to replace_chars(sub1, "'", "\\\\'")
+      -- run_js(gp, "document.querySelector(\"[aria-label='" & sub1 & "']\").click();")
+      if sub1 contains "/" then -- this is an album
+        run_js(gp, "
+          var e = document.createEvent('HTMLEvents');
+          e.initEvent(\"click\", true, false);
+          console.log(document.querySelector(\"[data-id='" & sub1 & "'] .play-button-container\").dispatchEvent(e));
+        ")
+      else
+        run_js(gp, "
+            var e = document.createEvent('HTMLEvents');
+            e.initEvent(\"click\", true, false);
+            document.querySelector(\"[data-id='" & sub1 & "'] [data-col='\" + titleColName + \"'] [data-id='play']\").dispatchEvent(e);
+        ")
+      end if
+      return "[]"
+    else
+      if (status = "paused") then
+        run_js(gp, "document.querySelector(\"[data-id='play-pause']\").click();")
+        return "[]"
+      end if
     end if
   else if (command = "pause") then
     if (status = "playing") then
-      google_play("document.querySelector(\"[data-id='play-pause']\").click();")
-      return
+      run_js(gp, "document.querySelector(\"[data-id='play-pause']\").click();")
+      return "[]"
     end if
   else if (command = "rewind") then
-    google_play("document.querySelector(\"[data-id='rewind']\").click();")
-    return
+    run_js(gp, "document.querySelector(\"[data-id='rewind']\").click();")
+    return "[]"
   else if (command = "forward") then
-    google_play("document.querySelector(\"[data-id='forward']\").click();")
-    return
-  else if (command = "track") then
-    return track
-  else if (command = "title") then
-    return google_play("document.getElementById('currently-playing-title').innerHTML;")
-  else if (command = "artist") then
-    return google_play("document.getElementById('player-artist').innerHTML;")
-  else if (command = "album") then
-    return google_play("document.getElementById('player-album').innerHTML;")
-  else if (command = "duration") then
-    return google_play("document.getElementById('time_container_duration').innerHTML;")
-  else if (command = "position") then
-    return google_play("document.getElementById('time_container_current').innerHTML;")
+    run_js(gp, "document.querySelector(\"[data-id='forward']\").click();")
+    return "[]"
+  else if (command = "status") then
+    return "{
+      \"status\": \"" & status & "\",
+      \"track\": \"" & track & "\",
+      \"title\": \"" & replace_chars(replace_chars(title, "\\", "\\\\"), "\"", "\\\"") & "\",
+      \"artist\": \"" & replace_chars(replace_chars(artist, "\\", "\\\\"), "\"", "\\\"") & "\",
+      \"album\": \"" & replace_chars(replace_chars(album, "\\", "\\\\"), "\"", "\\\"") & "\",
+      \"duration\": \"" & duration & "\",
+      \"position\": \"" & position & "\"
+    }"
+  else if (command = "search") then
+    if (sub1 = "artist") then
+      run_js(gp, "window.location.hash='#/sarts/' + '" & sub2 & "'.replace(/\\s+/g, '+');")
+      delay 1.5 -- todo: check to see if loaded
+      return run_js(gp, "
+          var data = [];
+          var songs = document.getElementsByClassName('song-row');
+          var titleColName = (document.querySelector(\".section-header\").innerHTML === \"Top songs\") ? 'index' : 'title';
+          for (row of songs) {
+            var id = row.getAttribute('data-id');
+            var title = row.querySelector(\"[data-col='\" + titleColName + \"'] span\").innerHTML.replace(/<[^>]*>/, '');
+            var duration = row.querySelector(\"[data-col='duration'] span\").innerHTML;
+            var artist = row.querySelector(\"[data-col='artist'] span a\").innerHTML;
+            var album = row.querySelector(\"[data-col='album'] span a\").innerHTML;
+            data.push({id, title, duration, artist, album});
+          }
+          JSON.stringify(data);
+      ")
+    end if
   end if
-  return
+  return "{\"error\": \"unknown command\"}"
 end run
 
-on google_play(js)
+on is_open(website)
   tell application "Google Chrome"
     repeat with w in (every window)
-      repeat with t in (every tab whose URL contains "play.google.com/music") of w
+      repeat with t in (every tab whose URL contains website) of w
+        return true
+      end repeat
+    end repeat
+  end tell
+  return false
+end is_open
+
+on open_url(website)
+  tell application "Google Chrome"
+    tell (make new window)
+      set URL of active tab to website
+      -- keystroke "m" using command down
+    end tell
+  end tell
+  return true
+end open_url
+
+on run_js(website, js)
+  tell application "Google Chrome"
+    repeat with w in (every window)
+      repeat with t in (every tab whose URL contains website) of w
         tell t
           execute javascript js
           get result
@@ -72,4 +197,13 @@ on google_play(js)
       end repeat
     end repeat
   end tell
-end google_play
+end run_js
+
+on replace_chars(this_text, search_string, replacement_string)
+  set AppleScript's text item delimiters to the search_string
+  set the item_list to every text item of this_text
+  set AppleScript's text item delimiters to the replacement_string
+  set this_text to the item_list as string
+  set AppleScript's text item delimiters to ""
+  return this_text
+end replace_chars
