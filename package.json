@@ -1,0 +1,25 @@
+{
+  "name": "google-play-music-cli",
+  "version": "0.1.0",
+  "description": "Automate Google Play Music from the Chrome Browser",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/straley/google-play-music-cli.git"
+  },
+  "keywords": [
+    "google",
+    "play",
+    "applescript"
+  ],
+  "author": "Scott Straley",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/straley/google-play-music-cli/issues"
+  },
+  "homepage": "https://github.com/straley/google-play-music-cli#readme"
+}
