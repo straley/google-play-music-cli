@@ -10,6 +10,10 @@ const action = (params, callback) => {
     results += data;
   });
   action.on('close', (code) => {
+    if (params[0] !== "status") {
+      console.log(":::::action:", params);
+      console.log(">", results);
+    }
     callback(JSON.parse(results));
   });
 };

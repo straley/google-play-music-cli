@@ -1,6 +1,11 @@
 #!/usr/bin/osascript
+global gp
 
 on run argv
+  set gp to "play.google.com/music"
+  set debug to true
+
+  -- parse arguments
   set command to item 1 of argv
   if (count of argv) > 1 then
     set sub1 to item 2 of argv
@@ -14,134 +19,45 @@ on run argv
     set sub2 to false
   end if
 
-  set gp to "play.google.com/music"
-
+  -- open google play music if not already open
   if (not is_open(gp))
     open_url("https://" & gp)
     delay 1.5
   end if
 
+  -- install companion js
+  set gpc_installed to run_js(gp, "typeof window.__C")
+  if (debug or not gpc_installed = "object") then
+    run_js(gp, (read (POSIX path of ((path to me as text) & "::") & "gp_companion.js")))
+  end if
 
-  set status to run_js(gp, "
-    try {
-      document.getElementById('player-bar-play-pause').className.indexOf('playing')!=-1?'playing':'paused';
-    }
-    catch (e) {
-      false
-    }
-  ")
-  set track to run_js(gp, "
-    try {
-      var t=document.getElementsByClassName('song-row currently-playing')[0].getAttribute('data-index');
-      (t?parseInt(t):-1)+1;
-    } catch (e) {
-      false
-    }
-  ")
-  set title to run_js(gp, "document.getElementById('currently-playing-title').innerHTML;")
-  if title is missing value then set title to ""
-  set artist to run_js(gp, "document.getElementById('player-artist')?document.getElementById('player-artist').innerHTML:\"\";")
-  if artist is missing value then set artist to ""
-  set album to run_js(gp, "document.getElementById('player-album')?document.getElementById('player-album').innerHTML:\"\";")
-  if album is missing value then set album to ""
-  set duration to run_js(gp, "document.getElementById('time_container_duration').innerHTML;")
-  if duration is missing value then set duration to ""
-  set position to run_js(gp, "document.getElementById('time_container_current').innerHTML;")
-  if position is missing value then set position to ""
+  set status to companion("get_status", {})
+  set track_number to companion("get_track_number", {})
+  set title to companion("get_title", {})
+  set artist to companion("get_artist", {})
+  set album to companion("get_album", {})
+  set duration to companion("get_duration", {})
+  set position to companion("get_position", {})
 
-  if (command = "find") then
-    -- todo: add more attributes and way to play
-    if (sub1 = "track") then
-      run_js(gp, "window.location.hash='#/srs/' + '" & sub2 & "/EAE'.replace(/\\s+/g, '+');")
-      delay 1.5 -- todo: check to see if loaded
-      return run_js(gp, "
-          var data = [];
-          var songs = document.getElementsByClassName('song-row');
-          for (row of songs) {
-            var id = row.getAttribute('data-id');
-            var title = row.querySelector(\"[data-col='\" + titleColName + \"'] span\").innerHTML.replace(/<[^>]*>/, '');
-            var duration = row.querySelector(\"[data-col='duration'] span\").innerHTML;
-            var artist = row.querySelector(\"[data-col='artist'] span a\").innerHTML;
-            var album = row.querySelector(\"[data-col='album'] span a\").innerHTML;
-            data.push({id, title, duration, artist, album});
-          }
-          JSON.stringify(data);
-      ")
-    else if (sub1 = "album") then
-      run_js(gp, "window.location.hash='#/sral/' + '" & sub2 & "/EAM'.replace(/\\s+/g, '+');")
-      delay 1.5 -- todo: check to see if loaded
-      return run_js(gp, "
-        var data = [];
-        var albums = document.getElementsByClassName('material-card');
-        for (row of albums) {
-          var id = row.getAttribute('data-id');
-          var album = row.querySelector(\".title\").innerHTML;
-          var artist =row.querySelector(\"[data-type='artist']\").innerHTML;
-          data.push({id, album, artist});
-        }
-        JSON.stringify(data);
-      ")
-    else if (sub1 = "artist") then
-      run_js(gp, "window.location.hash='#/srar/' + '" & sub2 & "/EAI'.replace(/\\s+/g, '+');")
-      delay 1.5 -- todo: check to see if loaded
-      return run_js(gp, "
-        var data = [];
-        var albums = document.getElementsByClassName('material-card');
-        for (row of albums) {
-          var id = row.getAttribute('data-id');
-          var artist = row.querySelector(\".title\").innerHTML;
-          data.push({id, album, artist});
-        }
-        JSON.stringify(data);
-      ")
-    end if
-    return "[]"
-  else if (command = "play") then
-    if (not sub1 = false) then
-      set sub1 to replace_chars(sub1, "'", "\\\\'")
-      -- run_js(gp, "document.querySelector(\"[aria-label='" & sub1 & "']\").click();")
-      if sub1 contains "/" then -- this is an album
-        run_js(gp, "
-          var e = document.createEvent('HTMLEvents');
-          e.initEvent(\"click\", true, false);
-          console.log(document.querySelector(\"[data-id='" & sub1 & "'] .play-button-container\").dispatchEvent(e));
-        ")
-      else
-        run_js(gp, "
-            var e = document.createEvent('HTMLEvents');
-            e.initEvent(\"click\", true, false);
-            document.querySelector(\"[data-id='" & sub1 & "'] [data-col='\" + titleColName + \"'] [data-id='play']\").dispatchEvent(e);
-        ")
-      end if
-      return "[]"
-    else
-      if (status = "paused") then
-        run_js(gp, "document.querySelector(\"[data-id='play-pause']\").click();")
-        return "[]"
-      end if
-    end if
-  else if (command = "pause") then
-    if (status = "playing") then
-      run_js(gp, "document.querySelector(\"[data-id='play-pause']\").click();")
-      return "[]"
-    end if
-  else if (command = "rewind") then
-    run_js(gp, "document.querySelector(\"[data-id='rewind']\").click();")
-    return "[]"
-  else if (command = "forward") then
-    run_js(gp, "document.querySelector(\"[data-id='forward']\").click();")
-    return "[]"
-  else if (command = "status") then
+  if (command = "status") then
     return "{
       \"status\": \"" & status & "\",
-      \"track\": \"" & track & "\",
+      \"track_number\": \"" & track_number & "\",
       \"title\": \"" & replace_chars(replace_chars(title, "\\", "\\\\"), "\"", "\\\"") & "\",
       \"artist\": \"" & replace_chars(replace_chars(artist, "\\", "\\\\"), "\"", "\\\"") & "\",
       \"album\": \"" & replace_chars(replace_chars(album, "\\", "\\\\"), "\"", "\\\"") & "\",
       \"duration\": \"" & duration & "\",
       \"position\": \"" & position & "\"
     }"
+  else if (command = "play") then
+    companion("play", {sub1})
+    return "[]"
+  else if (command = "pause") then
+    companion("pause", {})
+    return "[]"
   else if (command = "search") then
+    return companion("search", {sub1, sub2})
+    (*
     if (sub1 = "artist") then
       run_js(gp, "window.location.hash='#/sarts/' + '" & sub2 & "'.replace(/\\s+/g, '+');")
       delay 1.5 -- todo: check to see if loaded
@@ -160,8 +76,9 @@ on run argv
           JSON.stringify(data);
       ")
     end if
+    *)
   end if
-  return "{\"error\": \"unknown command\"}"
+  return "{\"error\": \"unknown command " & command & "\"}"
 end run
 
 on is_open(website)
@@ -199,6 +116,30 @@ on run_js(website, js)
   end tell
 end run_js
 
+on companion(command, params)
+  set results to {}
+  if (count of params > 0) then
+    repeat with p in params
+      if ((class of p) is text) then
+        set results to results & ("\"" & p & "\"")
+      else
+        set results to results & (p)
+      end if
+    end repeat
+  end if
+  set results to run_js(gp, "__C." & command & "(" & join(results, ",") & ")")
+  if ((class of results) is record) then
+    set wait_for to processing of results
+    set results to false
+    repeat while results = false
+      set results to run_js(gp, "__C." & wait_for)
+      delay 0.1
+    end repeat
+  end if
+  return results
+end companion
+
+
 on replace_chars(this_text, search_string, replacement_string)
   set AppleScript's text item delimiters to the search_string
   set the item_list to every text item of this_text
@@ -207,3 +148,12 @@ on replace_chars(this_text, search_string, replacement_string)
   set AppleScript's text item delimiters to ""
   return this_text
 end replace_chars
+
+on join(theList, delim)
+  set newString to ""
+  set oldDelims to AppleScript'stext item delimiters
+  set AppleScript'stext item delimiters to delim
+  set newString to theList as string
+  set AppleScript'stext item delimiters to oldDelims
+  return newString
+end join
