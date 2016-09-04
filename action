@@ -57,6 +57,8 @@ on run argv
     return "[]"
   else if (command = "search") then
     return companion("search", {sub1, sub2})
+  else if (command = "artist") then
+    return companion("artist", {sub1, sub2})
   end if
   return "{\"error\": \"unknown command " & command & "\"}"
 end run
@@ -108,13 +110,16 @@ on companion(command, params)
     end repeat
   end if
   set results to run_js(gp, "__C." & command & "(" & join(results, ",") & ")")
-  if ((class of results) is record) then
+  repeat while ((class of results) is record)
     set wait_for to processing of results
     set results to false
     repeat while results = false
-      set results to run_js(gp, "__C." & wait_for)
       delay 0.1
+      set results to run_js(gp, "__C." & wait_for)
     end repeat
+  end repeat
+  if (results = false) then
+    return "[]"
   end if
   return results
 end companion

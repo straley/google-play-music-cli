@@ -10,11 +10,15 @@ const action = (params, callback) => {
     results += data;
   });
   action.on('close', (code) => {
-    if (params[0] !== "status") {
+    let json = "[]";
+    try {
+      json = JSON.parse(results);
+    }
+    catch (e) {
       console.log(":::::action:", params);
       console.log(">", results);
     }
-    callback(JSON.parse(results));
+    callback(json);
   });
 };
 
@@ -22,14 +26,13 @@ app.get('/', function(req, res){
   res.sendFile(__dirname + '/index.html');
 });
 
-app.get('/api/find/artist/:name', (request, response) => {
-  action(['find','artist', request.params.name], function(results) {
-    response.json(results);
-  });
+app.get('/index.js', function(req, res){
+  res.sendFile(__dirname + '/index.js');
 });
 
-app.get('/api/find/track/:name', (request, response) => {
-  action(['find','track', request.params.name], function(results) {
+app.get('/api/search/:category/:name', (request, response) => {
+  action(['search', request.params.category, request.params.name], function(results) {
+    console.log(results);
     response.json(results);
   });
 });
@@ -58,8 +61,8 @@ app.get('/api/rewind', (request, response) => {
   });
 });
 
-app.get('/api/play/:id', (request, response) => {
-  action(['play',request.params.id], function(results) {
+app.get('/api/play/:album/:track', (request, response) => {
+  action(['play',request.params.album,request.params.track], function(results) {
     response.json(results);
   });
 });
@@ -70,8 +73,8 @@ app.get('/api/status', (request, response) => {
   });
 });
 
-app.get('/api/search/artist/:id', (request, response) => {
-  action(['search', 'artist', request.params.id], function(results) {
+app.get('/api/artist/:category/:id', (request, response) => {
+  action(['artist', request.params.category, request.params.id], function(results) {
     response.json(results);
   });
 });
