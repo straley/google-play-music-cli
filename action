@@ -50,33 +50,13 @@ on run argv
       \"position\": \"" & position & "\"
     }"
   else if (command = "play") then
-    companion("play", {sub1})
+    companion("play", {sub1, sub2})
     return "[]"
   else if (command = "pause") then
     companion("pause", {})
     return "[]"
   else if (command = "search") then
     return companion("search", {sub1, sub2})
-    (*
-    if (sub1 = "artist") then
-      run_js(gp, "window.location.hash='#/sarts/' + '" & sub2 & "'.replace(/\\s+/g, '+');")
-      delay 1.5 -- todo: check to see if loaded
-      return run_js(gp, "
-          var data = [];
-          var songs = document.getElementsByClassName('song-row');
-          var titleColName = (document.querySelector(\".section-header\").innerHTML === \"Top songs\") ? 'index' : 'title';
-          for (row of songs) {
-            var id = row.getAttribute('data-id');
-            var title = row.querySelector(\"[data-col='\" + titleColName + \"'] span\").innerHTML.replace(/<[^>]*>/, '');
-            var duration = row.querySelector(\"[data-col='duration'] span\").innerHTML;
-            var artist = row.querySelector(\"[data-col='artist'] span a\").innerHTML;
-            var album = row.querySelector(\"[data-col='album'] span a\").innerHTML;
-            data.push({id, title, duration, artist, album});
-          }
-          JSON.stringify(data);
-      ")
-    end if
-    *)
   end if
   return "{\"error\": \"unknown command " & command & "\"}"
 end run

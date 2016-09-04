@@ -1,97 +1,194 @@
 window.__C = {
+  // settings
+  queue: [],
+
+  // methods
+  // get the player status
   get_status: () => {
     try {
       return document.getElementById("player-bar-play-pause").className.indexOf("playing")!=-1?"playing":"paused";
     }
     catch (e) {
-      return false
+      return false;
     }
   },
+  // get the number of the track
   get_track_number: () => {
     try {
       const t = document.getElementsByClassName("song-row currently-playing")[0].getAttribute("data-index");
       return (t?parseInt(t):-1)+1;
     }
     catch (e) {
-      return -1
+      return -1;
     }
   },
+  // get the title of the track
   get_title: () => {
     try {
       return document.getElementById("currently-playing-title").innerHTML;
     }
     catch (e) {
-      return ""
+      return "";
     }
   },
+  // get the name of the artist
   get_artist: () => {
     try {
       const t = document.getElementById("player-artist");
       return (t?t.innerHTML:"");
     }
     catch (e) {
-      return ""
+      return "";
     }
   },
+  // get the name of the album
   get_album: () => {
     try {
       const t = document.getElementsByClassName("player-album")[0];
       return (t?t.innerHTML:"");
     }
     catch (e) {
-      return ""
+      return "";
     }
   },
+  // get the duration of the track
   get_duration: () => {
     try {
       const t = document.getElementById("time_container_duration");
       return (t?t.innerHTML:"");
     }
     catch (e) {
-      return ""
+      return "";
     }
   },
+  // get the position of the track
   get_position: () => {
     try {
       const t = document.getElementById("time_container_current");
       return (t?t.innerHTML:"");
     }
     catch (e) {
-      return ""
+      return "";
     }
   },
-  play: (id) => {
-    var stop_at_next_after_playing = () => {
-      if (__C.get_status() === "paused") {
-        setTimeout(stop_at_next_after_playing, 10);
-      } else {
-        __C.stop_at_next();
-      }
-    };
+  // resume playing, or play an ID
+  play: (lookup_album_id, lookup_track_id) => {
+    let tracks = [];
+    let trackFound = false;
 
-    if (id) {
-      var e = document.createEvent("HTMLEvents");
-      e.initEvent("click", true, false);
-      if (id.indexOf("/")!==-1) {
-        // this is an album
-        document.querySelector("[data-id='" + id + "'] .play-button-container").dispatchEvent(e);
+    if (typeof lookup_album_id !== "undefined") {
+      // go to album page
+      __C.wait_to_complete(
+        ".song-table tbody",
+        "#/album/" + lookup_album_id,
+        (nodes)=>{
+          if (!nodes || nodes.length === 0) {
+            tracks = "[]";
+          } else {
+            const data = [];
+            for(const n of nodes) {
+              if (n.className.split(" ").indexOf("song-row") !== -1) {
+                const id = n.getAttribute("data-id");
+                const track = n.querySelector("[data-col='title'] span").innerHTML.replace(/<[^>]*>/, '');
+                const duration = n.querySelector("[data-col='duration'] span").innerHTML;
+                const artist = n.querySelector("[data-col='artist'] span a").innerHTML;
+                const artist_id = n.querySelector("[data-col='artist']").getAttribute("data-matched-id");
+                const album = n.querySelector("[data-col='album'] span a").innerHTML;
+                const album_id = n.querySelector("[data-col='album']").getAttribute("data-matched-id");
+
+                if (id === lookup_track_id) {
+                  trackFound = true;
+                }
+
+                data.push({id, track, album, album_id, artist, artist_id, duration});
+              }
+            }
+            tracks = JSON.stringify(data);
+            if (typeof lookup_track_id !== "undefined") {
+              if (trackFound) {
+                const chain = [
+                  {
+                    selector:"#queue",
+                    event:"click",
+                    delay:150
+                  },
+                  {
+                    selector:"[data-id='clear-queue']",
+                    event:"click",
+                    delay:150
+                  },
+                  {
+                    selector:"[data-id='" + lookup_track_id + "'] paper-icon-button",
+                    event:"click",
+                    delay:150
+                  },
+                  {
+                    selector:"[id='\:8']",
+                    event:"mousedown",
+                    delay:50
+                  },
+                  {
+                    selector:"[id='\:8']",
+                    event:"mouseup",
+                    delay:250
+                  }
+                ];
+
+                // see if queue is already displayed
+                if (document.querySelector("#queue-overlay").getAttribute("style").indexOf("display: none")!==-1) {
+                  // don't show it
+                  chain.shift();
+                }
+
+                __C.chain(chain, __C.unpause);
+              }
+            } else {
+              // add all tracks to queue
+            }
+          }
+        }
+      );
+    }
+  },
+  toggle_player: (mode, callback) => {
+    let count = 0;
+    const do_toggle = () => {
+      const e = document.querySelector("#player-bar-play-pause");
+      if (e.getAttribute("aria-disabled")==="true") {
+        if (count < 20) {
+          setTimeout(()=>{
+            __C.toggle_player(mode, callback);
+          }, 100)
+        } else {
+          if (typeof callback === "function") callback();
+        }
       } else {
-        // this is a track
-        var titleColName = (document.querySelector(".section-header").innerHTML === "Top songs") ? 'index' : 'title';
-        document.querySelector("[data-id='" + id + "'] [data-col='" + titleColName + "'] [data-id='play']").dispatchEvent(e);
+        if (count < 20) {
+          setTimeout(()=>{
+            if (__C.get_status() !== mode) {
+              e.click();
+              if (typeof callback === "function") callback();
+            } else {
+              if (typeof callback === "function") callback();
+            }
+          }, 200);
+        } else {
+          if (typeof callback === "function") callback();
+        }
       }
-    } else {
-      if (__C.get_status() === "paused") {
-        document.querySelector("[data-id='play-pause']").click();
-        stop_at_next_after_playing();
-      }
+      count++;
     }
+    do_toggle();
   },
-  pause: () => {
-    if (__C.get_status() === "playing") {
-      document.querySelector("[data-id='play-pause']").click();
-    }
+  // pause playing
+  pause: (callback) => {
+    __C.toggle_player("paused", callback);
   },
+  // unpause playing
+  unpause: (callback) => {
+    __C.toggle_player("playing", callback);
+  },
+  // search for an artist[, album], or track
   search: (category, keywords) => {
     let result = false;
     if (category === "artist") {
@@ -105,8 +202,8 @@ window.__C = {
           } else {
             const data = [];
             for(const n of nodes) {
-              var id = n.getAttribute("data-id");
-              var artist = n.querySelector(".details .details-inner .title").innerHTML;
+              const id = n.getAttribute("data-id");
+              const artist = n.querySelector(".details .details-inner .title").innerHTML;
               data.push({id, artist});
             }
             __C.search_results = JSON.stringify(data);
@@ -114,11 +211,39 @@ window.__C = {
         }
       );
       return {"processing": "search_results"};
+    } else if (category === "track") {
+      __C.search_results = false;
+      __C.wait_to_complete(
+        ".songlist-container tbody",
+        "#/srs/" + keywords.replace(/\\s+/g, "+") + "/EAE",
+        (nodes)=>{
+          if (nodes.length === 0) {
+            __C.search_results = "[]";
+          } else {
+            const data = [];
+            for(const n of nodes) {
+              if (n.className.replace(/\s+$/,"") === "song-row") {
+                const id = n.getAttribute("data-id");
+                const track = n.querySelector("[data-col='title'] span").innerHTML.replace(/<[^>]*>/, '');
+                const duration = n.querySelector("[data-col='duration'] span").innerHTML;
+                const artist = n.querySelector("[data-col='artist'] span a").innerHTML;
+                const artist_id = n.querySelector("[data-col='artist']").getAttribute("data-matched-id");
+                const album = n.querySelector("[data-col='album'] span a").innerHTML;
+                const album_id = n.querySelector("[data-col='album']").getAttribute("data-matched-id");
+                data.push({id, track, album, album_id, artist, artist_id, duration});
+              }
+            }
+            __C.search_results = JSON.stringify(data);
+          }
+        }
+      );
     }
-    return false;
+    return {"processing": "search_results"};
   },
 
   /* utility function */
+
+  // wait for injected content load
   wait_to_complete: (selector, hash, callback) => {
     if (window.location.hash === hash) {
       // same query
@@ -126,19 +251,30 @@ window.__C = {
       callback(contents.childNodes);
     } else {
       let last_count = -1;
+      let tries = 0;
       const check_complete = () => {
+        tries++;
         const contents = document.querySelector(selector);
         if (contents) {
           if (contents.childNodes.length > last_count || contents.childNodes.length===0) {
             // still loading
             last_count = contents.childNodes.length;
-            setTimeout(check_complete, 100);
+            if (tries < 40) {
+              setTimeout(check_complete, 50);
+            } else {
+              // zero results
+              callback(false);
+            }
           } else {
             callback(contents.childNodes);
           }
         } else {
-          // zero results
-          callback(false);
+          if (tries < 40) {
+            setTimeout(check_complete, 50);
+          } else {
+            // zero results
+            callback(false);
+          }
         }
       }
       // clear out last results
@@ -148,12 +284,13 @@ window.__C = {
           contents.removeChild(contents.firstChild);
         }
       }
-      setTimeout(function(){
+      setTimeout(() => {
         window.location.hash=hash;
         setTimeout(check_complete, 300);
-      }, 10);
+      }, 100);
     }
   },
+  // convert position to seconds
   pos_to_seconds: (pos) => {
     const p = pos.split(":");
     try {
@@ -163,18 +300,24 @@ window.__C = {
       return -1
     }
   },
-  stop_at_next: () => {
-    const pos = __C.pos_to_seconds(__C.get_position());
-    const check_pos = () => {
-      if (__C.pos_to_seconds(__C.get_position()) < pos) {
-        __C.pause();
-        // clear queue with forwards here
-      } else {
-        if (__C.get_status() === "playing") {
-          setTimeout(check_pos, 500);
+  // do a series of dom actions
+  chain: (actions, callback) => {
+    const do_next_action = () => {
+      if (actions.length > 0) {
+        a = actions.shift();
+        let e = document.createEvent("HTMLEvents");
+        e.initEvent(a.event, true, false);
+        let t = document.querySelector(a.selector);
+        if (t) {
+          t.dispatchEvent(e);
         }
+        setTimeout(() => {
+          do_next_action();
+        }, a.delay);
+      } else {
+        if (typeof callback === "function") callback();
       }
     }
-    check_pos();
-  },
+    do_next_action();
+  }
 }
